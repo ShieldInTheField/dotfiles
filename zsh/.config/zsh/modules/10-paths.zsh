@@ -49,6 +49,11 @@ if [[ $(uname) != Darwin ]]; then
   path=(${path:#$HOME/Library/*})
 fi
 
+# Drop brew-only paths if the directories do not exist (keeps macOS users intact)
+for _maybe in /opt/homebrew/bin /opt/homebrew/sbin; do
+  [[ -d $_maybe ]] || path=(${path:#$_maybe})
+done
+
 # Deduplicate while preserving order
 typeset -U path
 export PATH
