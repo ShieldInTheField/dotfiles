@@ -1,0 +1,11 @@
+# reload: Reload the zsh shell, deactivating any active virtual environment first. 
+
+reload() {
+  if [[ -n "$VIRTUAL_ENV" ]]; then
+    echo "[zsh] Deactivating virtualenv: ${VIRTUAL_ENV:t}"
+    deactivate 2>/dev/null || true
+  fi
+
+  echo "[zsh] Reloading shell..."
+  exec zsh
+}

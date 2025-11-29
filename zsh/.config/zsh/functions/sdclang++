@@ -1,0 +1,8 @@
+# sdclang++: compile each .cpp arg to <base>.out with clang++
+
+sdclang++() {
+    for f in "$@"; do
+        base="${f%.cpp}"
+        clang++ "$f" -o "$base.out"
+    done
+}

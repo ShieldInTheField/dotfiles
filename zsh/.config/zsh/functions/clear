@@ -1,0 +1,15 @@
+# clear: run system clear, then print a cowsay greeting
+
+clear() {
+  emulate -L zsh
+  set -u
+
+  command clear
+
+  # Only if invoked without args
+  if [[ $# -eq 0 ]]; then
+    if command -v cowsay >/dev/null 2>&1; then
+      cowsay -t "Welcome back:)"
+    fi
+  fi
+}

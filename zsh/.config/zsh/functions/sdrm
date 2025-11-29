@@ -1,0 +1,133 @@
+# sdrm: rm with confirmation and preview
+
+sdrm() {
+if [ "$#" -eq 0 ]; then
+        echo "Usage: sdrm [options] <files or directories>"
+        echo "Try 'sdrm --help' for more information."
+        return 1
+    fi
+
+    # ---- help option ----
+    case "$1" in
+        -h|--help)
+            cat <<'EOF'
+sdrm - safe delete with confirmation and preview
+
+Usage:
+  sdrm <files or directories>
+
+Summary:
+  sdrm previews files and directories that would be removed
+  using 'tree -a' if available (or a fallback listing),
+  then asks for confirmation before running 'rm -rf'.
+
+Behavior:
+  • Files: listed individually before deletion.
+  • Directories: displayed recursively with 'tree -a'
+    (or flat 'ls -A -1' listing if 'tree' is not installed).
+  • Symlinks:
+      - Valid symlinks are deleted without touching their target.
+      - Broken symlinks are also detected and deleted.
+  • Dangerous paths are refused automatically:
+      '/', '.', '..', '~', $HOME, and quoted '/*'.
+
+Notes:
+  - Always asks for confirmation (no --force, no dry-run).
+  - Refuses to operate if all given targets are missing.
+  - Returns non-zero if aborted or refused.
+
+EOF
+            return 0
+            ;;
+    esac
+
+    # ---- helper: detect dangerous targets ----
+    _sdrm_is_dangerous() {
+        local arg="$1" resolved=""
+        # Immediate literals
+        case "$arg" in
+            /|.|..|~) return 0 ;;
+            '/*'|'/\*'|'/\**') return 0 ;;  # literal root-glob
+        esac
+        # $HOME literal
+        [ -n "$HOME" ] && [ "$arg" = "$HOME" ] && return 0
+
+        # Try to resolve to absolute; compare against / and $HOME
+        if command -v realpath >/dev/null 2>&1; then
+            resolved=$(realpath -- "$arg" 2>/dev/null || true)
+        elif command -v readlink >/dev/null 2>&1; then
+            resolved=$(readlink -f -- "$arg" 2>/dev/null || true)
+        else
+            # Portable-ish fallback
+            if [ -e "$arg" ] || [ -L "$arg" ]; then
+                resolved=$(
+                    cd -- "$(dirname -- "$arg")" 2>/dev/null && \
+                    printf '%s/%s\n' "$(pwd -P)" "$(basename -- "$arg")"
+                )
+            fi
+        fi
+        [ "$resolved" = "/" ] && return 0
+        [ -n "$HOME" ] && [ "$resolved" = "$HOME" ] && return 0
+
+        return 1
+    }
+
+    # Collect only existing targets
+    local -a to_delete=()
+    local target
+    for target in "$@"; do
+        if _sdrm_is_dangerous "$target"; then
+            echo "sdrm: refusing to operate on $target" >&2
+            return 1
+        fi
+        if [ -e "$target" ] || [ -L "$target" ]; then
+            to_delete+=("$target")
+        else
+            echo "sdrm: not found: $target" >&2
+        fi
+    done
+
+    if [ ${#to_delete[@]} -eq 0 ]; then
+        echo "Nothing to remove: no existing targets."
+        return 1
+    fi
+
+    echo "Files/directories that would be removed:"
+
+    # Preview
+    if command -v tree >/dev/null 2>&1; then
+        for target in "${to_delete[@]}"; do
+            if [ -d "$target" ]; then
+                echo
+                tree -a -- "$target"
+            else
+                printf "── %s\n" "$target"
+            fi
+        done
+    else
+        echo "tree command not found; falling back to listing."
+        for target in "${to_delete[@]}"; do
+            if [ -d "$target" ]; then
+                echo "./$target/"
+                ls -A -1 -- "$target" 2>/dev/null | sed 's/^/  └─ /'
+            else
+                printf "── %s\n" "$target"
+            fi
+        done
+    fi
+
+    echo
+    printf "Are you sure you want to permanently remove these files/directories? (y/n) "
+    IFS= read -r confirm </dev/tty || { echo "Aborted."; return 1; }
+
+    case "$confirm" in
+        y|Y)
+            command rm -rf -- "${to_delete[@]}"
+            echo "Removed."
+            ;;
+        *)
+            echo "Aborted."
+            return 1
+            ;;
+    esac
+}
