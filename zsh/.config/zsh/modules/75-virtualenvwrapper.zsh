@@ -10,10 +10,13 @@ type mkvirtualenv >/dev/null 2>&1 && return 0
 export WORKON_HOME="${WORKON_HOME:-$XDG_DATA_HOME/virtualenvs}"
 mkdir -p "$WORKON_HOME"
 
-# Choose Python: prefer pyenv's current python, else your Python.org install
+# Choose Python: prefer pyenv's current python, else a system python3, else Python.org path on macOS
 if command -v pyenv >/dev/null 2>&1; then
   export VIRTUALENVWRAPPER_PYTHON="${VIRTUALENVWRAPPER_PYTHON:-$(pyenv which python 2>/dev/null)}"
+elif command -v python3 >/dev/null 2>&1; then
+  export VIRTUALENVWRAPPER_PYTHON="${VIRTUALENVWRAPPER_PYTHON:-$(command -v python3)}"
 else
+  # macOS Python.org fallback; harmless on Linux if unused
   export VIRTUALENVWRAPPER_PYTHON="${VIRTUALENVWRAPPER_PYTHON:-/Library/Frameworks/Python.framework/Versions/3.13/bin/python3}"
 fi
 
