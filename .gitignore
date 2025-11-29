@@ -1,0 +1,5 @@
+# macOS artifacts
+.DS_Store
+
+# Local-only zsh overrides and state
+zsh/.config/zsh/modules/99-local.zsh
